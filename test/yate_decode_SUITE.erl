@@ -27,7 +27,10 @@ all() ->
      decode_invalid_setlocal_answer_event,
 
      decode_yate_message_answer_event,
-     decode_invalid_message_answer_event
+     decode_invalid_message_answer_event,
+
+     decode_yate_message_incoming_event,
+     decode_invalid_message_incoming_event
 
     ].
 
@@ -118,12 +121,32 @@ decode_yate_message_answer_event(_Config) ->
     ExpectedValue = #yate_event{
       direction=answer,
       type=message,
-      attrs=[{id, "messageid001"},{processed, "true"},{name, "call.route"},{retval, "true"}],
+      attrs=[{id, "messageid001"},{processed, "true"},{name, "call.route"},{retval, "retvalue"}],
       params=[{chan_id, "sip/1"},{target_id, "sip/2"}]
      },
-    ExpectedValue = yate_decode:from_binary(<<"%%<message:messageid001:true:call.route:true:chan_id=sip/1:target_id=sip/2">>).
+    ExpectedValue = yate_decode:from_binary(<<"%%<message:messageid001:true:call.route:retvalue:chan_id=sip/1:target_id=sip/2">>).
 
 decode_invalid_message_answer_event(_Config) ->
-    %%% NOTE: missing setlocal a lot of data 
+    %%% NOTE: answer message missing a lot of data 
     YateInvalidDataException = (catch yate_decode:from_binary(<<"%%<message:call.route">>)),
-    invalid_data = YateInvalidDataException#yate_exception.type.
+    invalid_data = YateInvalidDataException#yate_exception.type,
+%%% NOTE: Invalid message parameter (need '=' key/value separator)
+    YateInvalidDataException2 = (catch yate_decode:from_binary(<<"%%<message:messageid001:true:call.route:retvalue:chan_id:testvalue">>)),
+    invalid_data = YateInvalidDataException2#yate_exception.type.
+
+decode_yate_message_incoming_event(_Config) ->
+    ExpectedValue = #yate_event{
+      direction=incoming,
+      type=message,
+      attrs=[{id, "messageid001"},{time, "123456789"},{name, "call.route"},{retval, "retvalue"}],
+      params=[{chan_id, "sip/1"},{target_id, "sip/2"}]
+     },
+    ExpectedValue = yate_decode:from_binary(<<"%%>message:messageid001:123456789:call.route:retvalue:chan_id=sip/1:target_id=sip/2">>).
+
+decode_invalid_message_incoming_event(_Config) ->
+    %%% NOTE: incoming message missing a lot of data 
+    YateInvalidDataException = (catch yate_decode:from_binary(<<"%%>message:call.route">>)),
+    invalid_data = YateInvalidDataException#yate_exception.type,
+    %%% NOTE: Invalid message parameter (need '=' key/value separator)
+    YateInvalidDataException2 = (catch yate_decode:from_binary(<<"%%>message:messageid001:123456789:call.route:retvalue:chan_id:testvalue">>)),
+    invalid_data = YateInvalidDataException2#yate_exception.type.
