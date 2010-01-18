@@ -1,0 +1,27 @@
+** this is the overview.doc file for the application 'yaterl' **
+
+   @author Luca Greco <luca.greco@alcacoop.it>
+   @copyright 2009-2010 Alca Societa' Cooperativa 
+   @version 0.1
+   @title yaterl: YATE Erlang module
+   @doc `yaterl' is an Erlang module to interfacing Erlang to YATE Telephone Engine,
+        developed by Alca Societa' Cooperativa ([http://alcacoop.it]), to create
+        persistent VOIP application over the powerful feature of the Erlang OTP framework.
+
+	== Status ==
+
+	<ul>
+	<li> decode yate message from binary strings (DONE) </li>
+        <li> encode yate message to binary strings (DONE) </li>
+        <li> yate_event record definition (DONE) </li>
+        <li> cover decode/encode with common-test (TODO) </li>
+        <li> yate_socket_connection process (TODO) </li>
+        <li> yate_tcp_connection process (TODO) </li>
+        <li> yaterl config file (TODO) </li>
+        <li> escript interfacing yate as internal module (TODO) </li>
+	</ul>
+
+	== Examples ==
+
+	TODO
+   @end
