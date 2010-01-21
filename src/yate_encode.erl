@@ -36,15 +36,15 @@
 to_binary(YateEvt) when is_record(YateEvt,yate_event) ->
     encode_yate_event(YateEvt);
 to_binary(_Any) ->
-    ?THROW_YATE_EXCEPTION(datainvalid, "Argument should be a yate_event record", _Any).
+    ?THROW_YATE_EXCEPTION(invalid_data, "Argument should be a yate_event record", _Any).
 
 %% private function to convert a yate_event in a binary string by type and direction 
 %% NOTE: only existent "Application to Engine" yate events have been implemented
 encode_yate_event(#yate_event{type=message, direction=outgoing, attrs=Attrs, params=MsgParams}) ->
-    << "%%>", "message", (encode_attributes(message_outgoing, Attrs))/binary, 
+    << "%%>", "message", (encode_attributes(message_outgoing, Attrs))/binary,
      (encode_attributes(message_params, MsgParams))/binary>>;
 encode_yate_event(#yate_event{type=message, direction=answer, attrs=Attrs, params=MsgParams}) ->
-    << "%%<", "message", (encode_attributes(message_answer, Attrs))/binary, 
+    << "%%<", "message", (encode_attributes(message_answer, Attrs))/binary,
      (encode_attributes(message_params, MsgParams))/binary>>;
 encode_yate_event(#yate_event{type=Type, direction=outgoing, attrs=Attrs}) ->
     StringType = atom_to_list(Type),
@@ -56,6 +56,18 @@ encode_yate_event(YateEvt) ->
 %%
 %%% TODO: use dict:fetch and throw a YATE exception if attrs are invalid (not complete) 
 %%%       or set a default value
+encode_attributes(connect, Attrs) ->
+    AttrsDict = dict:from_list(Attrs),
+    Role = dict:fetch(role, AttrsDict),
+    ChannelId = case (dict:find(channel_id, AttrsDict)) of
+		  {ok, Value} -> [ Value ] ;
+		  error -> [ ]
+	      end,
+    ChannelType = case (dict:find(channel_type, AttrsDict)) of
+		  {ok, Value2} -> [ Value2 ];
+		  error -> [ ]
+	      end,
+    join_event_chunks([Role] ++ ChannelId ++ ChannelType);
 encode_attributes(install, Attrs) ->
     AttrsDict = dict:from_list(Attrs),
     Name = dict:fetch(name, AttrsDict),
@@ -80,7 +92,7 @@ encode_attributes(setlocal, Attrs) ->
     join_event_chunks([Name, Value]);
 encode_attributes(output, Attrs) ->
     AttrsDict = dict:from_list(Attrs),
-    Value = dict:fetch(value, AttrsDict),
+    Value = dict:fetch(text, AttrsDict),
     join_event_chunks([Value]);
 encode_attributes(message_outgoing, Attrs) ->
     AttrsDict = dict:from_list(Attrs),
@@ -89,7 +101,7 @@ encode_attributes(message_outgoing, Attrs) ->
     Name = dict:fetch(name, AttrsDict),
     RetValue = case (dict:find(retvalue, AttrsDict)) of
 		   {ok, Value} -> Value;
-		   error -> [":"]
+		   error -> [ ]
 	       end,
     join_event_chunks([Id, Time, Name, RetValue]);
 encode_attributes(message_answer, Attrs) ->
@@ -98,17 +110,17 @@ encode_attributes(message_answer, Attrs) ->
     Processed = dict:fetch(processed, AttrsDict),
     Name = case (dict:find(name, AttrsDict)) of
 	       {ok, NameValue} -> NameValue;
-	       error -> []
+	       error -> [ ]
 	   end,
     RetValue = case (dict:find(retvalue, AttrsDict)) of
-		   {ok, Value} -> Value;
-		   error -> [":"]
+		   {ok, Value} -> Value ;
+		   error -> [ ":" ]
 	       end,
     join_event_chunks([Id, Processed, Name, RetValue]);
 encode_attributes(message_params, MsgParams) ->
     % map and join message params with a '=' character
     FlatMsgParams = lists:flatmap(fun({X,Y}) -> 
-					  [(encode_chunk(X)),<<"=">>,(encode_chunk(Y))]  
+					  [<<":">>,(encode_chunk(X)),<<"=">>,(encode_chunk(Y))]  
 				  end, MsgParams),
     << <<B/binary>> || B <- FlatMsgParams >>;
 encode_attributes(name_attr, Attrs) ->
@@ -121,9 +133,9 @@ encode_attributes(name_attr, Attrs) ->
 join_event_chunks([H]) ->
     << ":", (encode_chunk(H))/binary >>;
 join_event_chunks([]) ->
-    << >>;
+    << ":" >>;
 join_event_chunks([H|T]) ->
-    << (join_event_chunks([H]))/binary, (join_event_chunks(T))/binary >>.
+    << ":", (encode_chunk(H))/binary, (join_event_chunks(T))/binary >>.
 
 %% conver to binary single chunks
 %%% TODO: encode special chars (es. ':')
@@ -135,3 +147,21 @@ encode_chunk(C) when is_atom(C)->
     encode_chunk(atom_to_list(C));
 encode_chunk(C) when is_binary(C) ->
     C.
+
+string_encode([H], Extra) ->
+    char_encode([ H ], Extra);
+string_encode([H|T], Extra) ->
+    char_encode([ H ], Extra) ++ string_encode(T, Extra) .
+
+%%% TODO: insert YATE char encoding rules from docs
+char_encode("%", _Extra) ->
+    "%%";
+char_encode(":", _Extra) ->
+    "%Z";
+char_encode([C], [C]) ->
+    C1 = 32 + C,
+    [ 37, C1 ];  %% NOTE: 37 = '%'
+char_encode([ C ], _Extra) when C >= 32 ->
+    [ C ];
+char_encode([ C ], _Extra) when C < 32 ->
+    [ 32 + C ].

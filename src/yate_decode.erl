@@ -33,23 +33,41 @@
 %% @doc decode message type and call specialized attributes parsing functions
 %% @spec from_binary(Raw::binary()) -> yate_event()
 from_binary(Raw = <<"Error in: ", Msg/binary>>) when is_binary(Raw) ->
-    #yate_event{ direction=incoming, type=error, attrs=[{msg, binary_to_list(Msg)}] };
+    #yate_event{ direction=incoming, type=error, 
+		 attrs=apply_string_decode_on_values([{msg, binary_to_list(Msg)}]) 
+		};
 from_binary(Raw = <<"%%<install:", Rest/binary>>) when is_binary(Raw) -> 
-    #yate_event{ direction=answer, type=install, attrs=decode_install_answer_attributes(Rest) };
+    #yate_event{ direction=answer, type=install, 
+		 attrs=apply_string_decode_on_values(decode_install_answer_attributes(Rest)) 
+		};
 from_binary(Raw = <<"%%<uninstall:", Rest/binary>>) when is_binary(Raw) -> 
-    #yate_event{ direction=answer, type=uninstall, attrs=decode_uninstall_answer_attributes(Rest) };
+    #yate_event{ direction=answer, type=uninstall, 
+		 attrs=apply_string_decode_on_values(decode_uninstall_answer_attributes(Rest)) 
+		};
 from_binary(Raw = <<"%%<watch:", Rest/binary>>) when is_binary(Raw) -> 
-    #yate_event{ direction=answer, type=watch, attrs=decode_watch_answer_attributes(Rest) };
+    #yate_event{ direction=answer, type=watch, 
+		 attrs=apply_string_decode_on_values(decode_watch_answer_attributes(Rest)) 
+		};
 from_binary(Raw = <<"%%<unwatch:", Rest/binary>>) when is_binary(Raw) -> 
-    #yate_event{ direction=answer, type=unwatch, attrs=decode_unwatch_answer_attributes(Rest) };
+    #yate_event{ direction=answer, type=unwatch, 
+		 attrs=apply_string_decode_on_values(decode_unwatch_answer_attributes(Rest)) 
+		};
 from_binary(Raw = <<"%%<setlocal:", Rest/binary>>) when is_binary(Raw) -> 
-    #yate_event{ direction=answer, type=setlocal, attrs=decode_setlocal_answer_attributes(Rest) };
+    #yate_event{ direction=answer, type=setlocal, 
+		 attrs=apply_string_decode_on_values(decode_setlocal_answer_attributes(Rest)) 
+		};
 from_binary(Raw = <<"%%<message:", Rest/binary>>) when is_binary(Raw) -> 
     [ EventAttrs, MsgParams ] = decode_message_answer_attributes(Rest),
-    #yate_event{ direction=answer, type=message, attrs=EventAttrs, params=MsgParams };
+    #yate_event{ direction=answer, type=message, 
+		 attrs=apply_string_decode_on_values(EventAttrs), 
+		 params=apply_string_decode_on_values(MsgParams) 
+		};
 from_binary(Raw = <<"%%>message:", Rest/binary>>) when is_binary(Raw) ->
     [ EventAttrs, MsgParams ] = decode_message_incoming_attributes(Rest),
-    #yate_event{ direction=incoming, type=message, attrs=EventAttrs, params=MsgParams };
+    #yate_event{ direction=incoming, type=message, 
+		 attrs=apply_string_decode_on_values(EventAttrs), 
+		 params=apply_string_decode_on_values(MsgParams) 
+		};
 from_binary(_Unknown) when is_binary(_Unknown) ->
     ?THROW_YATE_EXCEPTION(unknown_event, "Invalid Engine YATE Event", _Unknown);
 from_binary(_Unknown) ->
@@ -129,4 +147,31 @@ decode_message_parameters([H|T] = RawMsgParams) when is_list(RawMsgParams) ->
     [MsgParam | decode_message_parameters(T)];
 decode_message_parameters([]) ->
     [].
+
+
+%% FROM yate-extmodule-doc
+%% Any value that contains special characters (ASCII code lower than 32) MUST have them converted
+%% to %<upcode> where <upcode> is the character with a numeric value equal with 64 + original ASCII code. 
+%% The % character itself MUST be converted to a special %% representation. Characters with codes higher 
+%% than 32 (except %) SHOULD not be escaped but may be so. A %-escaped code may be received instead of 
+%% an unescaped character anywhere except in the initial keyword or the delimiting colon (:) characters. 
+%% Anywhere in the line except the initial keyword a % character not followed by a character with a numeric 
+%% value higher than 64 (40H, 0x40, '@') or another % is an error.
+
+apply_string_decode_on_values(KVList) ->
+    lists:keymap(fun string_decode/1, 2, KVList).
+
+string_decode([H]) ->
+    [ H ];
+string_decode([H1,H2| T]) ->
+    NewH = case ([H1,H2]) of
+	       [ $%, $% ] -> NewT = T, 
+			     [ $% ];
+	       [ $%, C ] when C > 64 -> NewT = T, 
+					[ C - 32 ];
+%	[ $%, > ] when C < 64 -> ERROR;
+	       [ C1, C2 ] -> NewT = [ C2 | T ],
+			      [ C1 ]
+	   end,
+    NewH ++ string_decode(NewT).
 
