@@ -8,13 +8,18 @@ all() ->
     [
      encode_nonbinary_data,
      encode_invalid_application_yate_event,
-     encode_output_yate_event,
+     string_encode,
+
      encode_connect_yate_event,
+     encode_output_yate_event,
+     encode_setlocal_yate_event,
+
      encode_install_yate_event,
      encode_uninstall_yate_event,
+
      encode_watch_yate_event,
      encode_unwatch_yate_event,
-     encode_setlocal_yate_event,
+
      encode_message_outgoing_yate_event,
      encode_message_answer_yate_event
     ].
@@ -25,6 +30,10 @@ encode_nonbinary_data(_Config) ->
     invalid_data = YateInvalidDataException#yate_exception.type.
 
 encode_invalid_application_yate_event(_Config) ->
+    { skip, "Test not yet implemented"}.
+
+string_encode(_Config) ->
+    
     { skip, "Test not yet implemented"}.
 
 encode_output_yate_event(_Config) ->
@@ -128,10 +137,10 @@ encode_message_answer_yate_event(_Config) ->
     YateEventMissingRetValue = #yate_event{
       type=message,
       direction=answer,
-      attrs=[{id, "generated_id_123"},{processed, "true"},{name, "call.route"},{retvalue, "retvalue"}],
+      attrs=[{id, "generated_id_123"},{processed, "true"},{name, "call.route"}],
       params=[{chan_id, "sip/1"}]
      },
-    <<"%%<message:generated_id_123:true:call.route:retvalue:chan_id=sip/1">> = yate_encode:to_binary(YateEventMissingRetValue),
+    <<"%%<message:generated_id_123:true:call.route::chan_id=sip/1">> = yate_encode:to_binary(YateEventMissingRetValue),
     io:format("starting missing name"),
     YateEventMissingName = #yate_event{
       type=message,

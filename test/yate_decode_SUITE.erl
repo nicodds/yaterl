@@ -9,6 +9,8 @@ all() ->
      decode_nonbinary_data,
      decode_unknown_events,
 
+     string_decode,
+
      decode_yate_errorin_incoming_event,
 
      decode_yate_install_answer_event,
@@ -43,6 +45,10 @@ decode_unknown_events(_Config) ->
     %%% NOTE: invalid direction of install message (incoming instead of answer or outgoing)
     YateUnknownEventException = (catch yate_decode:from_binary(<<"%%>install:100:call.route:true">>)),
     unknown_event = YateUnknownEventException#yate_exception.type.
+
+string_decode(_Config) ->
+    { skip, "Test not yet implemented"}.
+
 
 decode_yate_errorin_incoming_event(_Config) ->
     ExpectedValue = #yate_event{

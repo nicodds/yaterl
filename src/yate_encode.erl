@@ -114,7 +114,7 @@ encode_attributes(message_answer, Attrs) ->
 	   end,
     RetValue = case (dict:find(retvalue, AttrsDict)) of
 		   {ok, Value} -> Value ;
-		   error -> [ ":" ]
+		   error -> [ ]
 	       end,
     join_event_chunks([Id, Processed, Name, RetValue]);
 encode_attributes(message_params, MsgParams) ->
