@@ -25,7 +25,7 @@ encode_nonbinary_data(_Config) ->
     invalid_data = YateInvalidDataException#yate_exception.type.
 
 encode_invalid_application_yate_event(_Config) ->
-    ?THROW_YATE_EXCEPTION(not_implemented, "Test not yet implemented", []).
+    { skip, "Test not yet implemented"}.
 
 encode_output_yate_event(_Config) ->
     YateEvent = #yate_event{

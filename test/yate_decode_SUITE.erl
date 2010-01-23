@@ -50,7 +50,7 @@ decode_yate_errorin_incoming_event(_Config) ->
       type=error,
       attrs=[{msg,"Test YATE error event decoding"}]
      },
-    ExpectedValue = yate_decode:from_binary(<<"Error in: Test YATE error event decoding">>).
+    ExpectedValue = yate_decode:from_binary(<<"Error in:Test YATE error event decoding">>).
 
 decode_yate_install_answer_event(_Config) ->
     ExpectedValue = #yate_event{

@@ -23,7 +23,7 @@
 %% @doc 'yate_decode' is a simple yate module to decode yate_event erlang records from binary strings.
 -module(yate_decode).
 
--compile(export_all).
+%%-compile(export_all).
 
 %% @headerfile "../include/yate.hrl"
 -include("yate.hrl").
@@ -32,38 +32,38 @@
 
 %% @doc decode message type and call specialized attributes parsing functions
 %% @spec from_binary(Raw::binary()) -> yate_event()
-from_binary(Raw = <<"Error in: ", Msg/binary>>) when is_binary(Raw) ->
+from_binary(Raw = <<"Error in:", Msg/binary>>) when is_binary(Raw) ->
     #yate_event{ direction=incoming, type=error, 
 		 attrs=apply_string_decode_on_values([{msg, binary_to_list(Msg)}]) 
 		};
 from_binary(Raw = <<"%%<install:", Rest/binary>>) when is_binary(Raw) -> 
     #yate_event{ direction=answer, type=install, 
-		 attrs=apply_string_decode_on_values(decode_install_answer_attributes(Rest)) 
+		 attrs=apply_string_decode_on_values(decode_attributes(install_answer, Rest)) 
 		};
 from_binary(Raw = <<"%%<uninstall:", Rest/binary>>) when is_binary(Raw) -> 
     #yate_event{ direction=answer, type=uninstall, 
-		 attrs=apply_string_decode_on_values(decode_uninstall_answer_attributes(Rest)) 
+		 attrs=apply_string_decode_on_values(decode_attributes(uninstall_answer, Rest)) 
 		};
 from_binary(Raw = <<"%%<watch:", Rest/binary>>) when is_binary(Raw) -> 
     #yate_event{ direction=answer, type=watch, 
-		 attrs=apply_string_decode_on_values(decode_watch_answer_attributes(Rest)) 
+		 attrs=apply_string_decode_on_values(decode_attributes(watch_answer, Rest)) 
 		};
 from_binary(Raw = <<"%%<unwatch:", Rest/binary>>) when is_binary(Raw) -> 
     #yate_event{ direction=answer, type=unwatch, 
-		 attrs=apply_string_decode_on_values(decode_unwatch_answer_attributes(Rest)) 
+		 attrs=apply_string_decode_on_values(decode_attributes(unwatch_answer, Rest)) 
 		};
 from_binary(Raw = <<"%%<setlocal:", Rest/binary>>) when is_binary(Raw) -> 
     #yate_event{ direction=answer, type=setlocal, 
-		 attrs=apply_string_decode_on_values(decode_setlocal_answer_attributes(Rest)) 
+		 attrs=apply_string_decode_on_values(decode_attributes(setlocal_answer, Rest)) 
 		};
 from_binary(Raw = <<"%%<message:", Rest/binary>>) when is_binary(Raw) -> 
-    [ EventAttrs, MsgParams ] = decode_message_answer_attributes(Rest),
+    [ EventAttrs, MsgParams ] = decode_attributes(message_answer, Rest),
     #yate_event{ direction=answer, type=message, 
 		 attrs=apply_string_decode_on_values(EventAttrs), 
 		 params=apply_string_decode_on_values(MsgParams) 
 		};
 from_binary(Raw = <<"%%>message:", Rest/binary>>) when is_binary(Raw) ->
-    [ EventAttrs, MsgParams ] = decode_message_incoming_attributes(Rest),
+    [ EventAttrs, MsgParams ] = decode_attributes(message_incoming, Rest),
     #yate_event{ direction=incoming, type=message, 
 		 attrs=apply_string_decode_on_values(EventAttrs), 
 		 params=apply_string_decode_on_values(MsgParams) 
@@ -87,65 +87,61 @@ from_binary(_Unknown) ->
 % throw({ not_implemented, {data, Rest}, { where, ?FILE, ?LINE } }).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-decode_install_answer_attributes(Rest) when is_binary(Rest) ->
+decode_attributes(install_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Priority, Name, Success ] -> [ { priority, Priority }, { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing install answer attributes", _Any)
 %% throw({ invalid_data, {data, _Any}, { where, ?FILE, ?LINE } })
-    end.
-
-decode_uninstall_answer_attributes(Rest) when is_binary(Rest) ->
+    end;
+decode_attributes(uninstall_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing uninstall answer attributes", _Any)
-    end.
-
-decode_watch_answer_attributes(Rest) when is_binary(Rest) ->
+    end;
+decode_attributes(watch_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing watch answer attributes", _Any)
-    end.
-
-decode_unwatch_answer_attributes(Rest) when is_binary(Rest) ->
+    end;
+decode_attributes(unwatch_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing unwatch answer attributes", _Any)
-    end.
-
-decode_setlocal_answer_attributes(Rest) when is_binary(Rest) ->
+    end;
+decode_attributes(setlocal_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Name, Value, Success ] -> [ { name, Name }, { value, Value }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing setlocal answer attributes", _Any)
-    end.
+    end;
 
 %%% %%<message:<id>:<processed>:[<name>]:<retvalue>[:<key>=<value>...]
 %%% TODO: name is optional verify with a test
-decode_message_answer_attributes(Rest) when is_binary(Rest) ->
+decode_attributes(message_answer, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Id, Processed, Name, RetVal | RawMsgParams ] -> 
 	    Attrs = [ { id, Id }, { processed, Processed }, { name, Name }, { retval, RetVal }],
-	    MsgParams = decode_message_parameters(RawMsgParams),
+	    MsgParams = decode_attributes(message_parameters, RawMsgParams),
 	    [Attrs, MsgParams];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing answer message attributes", _Any)
-    end.
+    end;
 
 %%% %%>message:<id>:<time>:<name>:<retvalue>[:<key>=<value>...]
-decode_message_incoming_attributes(Rest) when is_binary(Rest) ->
+decode_attributes(message_incoming, Rest) when is_binary(Rest) ->
     case string:tokens(binary_to_list(Rest), ":") of
 	[ Id, Time, Name, RetVal | RawMsgParams ] -> 
 	    Attrs = [ { id, Id }, { time, Time }, { name, Name }, { retval, RetVal }],
-	    MsgParams = decode_message_parameters(RawMsgParams),
+	    MsgParams = decode_attributes(message_parameters, RawMsgParams),
 	    [Attrs, MsgParams];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing incoming message attributes", _Any)
-    end.
+    end;
 
-decode_message_parameters([H|T] = RawMsgParams) when is_list(RawMsgParams) ->
+decode_attributes(message_parameters, [H|T] = RawMsgParams) when is_list(RawMsgParams) ->
     MsgParam = case string:tokens(H, "=") of
 		   [Key, Value] -> { list_to_atom(Key), Value };
 		   _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing message parameters", _Any)
 	       end,
-    [MsgParam | decode_message_parameters(T)];
-decode_message_parameters([]) ->
+    [MsgParam | decode_attributes(message_parameters, T)];
+decode_attributes(message_parameters, []) ->
     [].
 
 
@@ -169,7 +165,7 @@ string_decode([H1,H2| T]) ->
 			     [ $% ];
 	       [ $%, C ] when C > 64 -> NewT = T, 
 					[ C - 32 ];
-%	[ $%, > ] when C < 64 -> ERROR;
+%	       [ $%, C ] when C < 64 -> ERROR;
 	       [ C1, C2 ] -> NewT = [ C2 | T ],
 			      [ C1 ]
 	   end,
