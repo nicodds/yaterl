@@ -50,7 +50,7 @@ encode_yate_event(#yate_event{type=Type, direction=outgoing, attrs=Attrs}) ->
     StringType = atom_to_list(Type),
     << "%%>", (list_to_binary(StringType))/binary, (encode_attributes(Type, Attrs))/binary>>;
 encode_yate_event(YateEvt) ->
-    ?THROW_YATE_EXCEPTION(invalid_application_yate_event, "Invalid Application YATE Event", YateEvt).
+    ?THROW_YATE_EXCEPTION(invalid_application_event, "Invalid Application YATE Event", YateEvt).
 
 %% fetch and encode attributes by type 
 %%
@@ -120,7 +120,7 @@ encode_attributes(message_answer, Attrs) ->
 encode_attributes(message_params, MsgParams) ->
     % map and join message params with a '=' character
     FlatMsgParams = lists:flatmap(fun({X,Y}) -> 
-					  [<<":">>,(encode_chunk(X)),<<"=">>,(encode_chunk(Y))]  
+					  [<<":">>,(encode_chunk(X,"=")),<<"=">>,(encode_chunk(Y, "="))]  
 				  end, MsgParams),
     << <<B/binary>> || B <- FlatMsgParams >>;
 encode_attributes(name_attr, Attrs) ->
@@ -131,37 +131,38 @@ encode_attributes(name_attr, Attrs) ->
 
 %% join yate event chunks (with a ':' character) in a binary strean 
 join_event_chunks([H]) ->
-    << ":", (encode_chunk(H))/binary >>;
+    << ":", (encode_chunk(H,""))/binary >>;
 join_event_chunks([]) ->
-    << ":" >>;
+    << >>;
 join_event_chunks([H|T]) ->
-    << ":", (encode_chunk(H))/binary, (join_event_chunks(T))/binary >>.
+    << ":", (encode_chunk(H,""))/binary, (join_event_chunks(T))/binary >>.
 
 %% conver to binary single chunks
-%%% TODO: encode special chars (es. ':')
-encode_chunk(C) when is_integer(C) ->
-    list_to_binary(integer_to_list(C));
-encode_chunk(C) when is_list(C) ->
-    list_to_binary(C);
-encode_chunk(C) when is_atom(C)->
-    encode_chunk(atom_to_list(C));
-encode_chunk(C) when is_binary(C) ->
+encode_chunk(C, Extra) when is_integer(C) ->
+    list_to_binary(string_encode(integer_to_list(C),Extra));
+encode_chunk(C, Extra) when is_list(C) ->
+    list_to_binary(string_encode(C, Extra));
+encode_chunk(C, Extra) when is_atom(C)->
+    encode_chunk(atom_to_list(C), Extra);
+encode_chunk(C, Extra) when is_binary(C) ->
     C.
 
 string_encode([H], Extra) ->
     char_encode([ H ], Extra);
 string_encode([H|T], Extra) ->
-    char_encode([ H ], Extra) ++ string_encode(T, Extra) .
+    char_encode([ H ], Extra) ++ string_encode(T, Extra);
+string_encode([], _Extra) ->
+    [].
 
 %%% TODO: insert YATE char encoding rules from docs
 char_encode("%", _Extra) ->
     "%%";
 char_encode(":", _Extra) ->
-    "%Z";
+    [ $%, 64 + $: ];
 char_encode([C], [C]) ->
-    C1 = 32 + C,
+    C1 = 64 + C,
     [ 37, C1 ];  %% NOTE: 37 = '%'
-char_encode([ C ], _Extra) when C >= 32 ->
-    [ C ];
 char_encode([ C ], _Extra) when C < 32 ->
-    [ 32 + C ].
+    [ 37, 64 + C ];
+char_encode([ C ], _Extra) when C >= 32 ->
+    [ C ].

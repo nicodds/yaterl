@@ -23,7 +23,7 @@
 %% @doc 'yate_decode' is a simple yate module to decode yate_event erlang records from binary strings.
 -module(yate_decode).
 
-%%-compile(export_all).
+-compile(export_all).
 
 %% @headerfile "../include/yate.hrl"
 -include("yate.hrl").
@@ -88,28 +88,28 @@ from_binary(_Unknown) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 decode_attributes(install_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Priority, Name, Success ] -> [ { priority, Priority }, { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing install answer attributes", _Any)
 %% throw({ invalid_data, {data, _Any}, { where, ?FILE, ?LINE } })
     end;
 decode_attributes(uninstall_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing uninstall answer attributes", _Any)
     end;
 decode_attributes(watch_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing watch answer attributes", _Any)
     end;
 decode_attributes(unwatch_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Name, Success ] -> [ { name, Name }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing unwatch answer attributes", _Any)
     end;
 decode_attributes(setlocal_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Name, Value, Success ] -> [ { name, Name }, { value, Value }, { success, Success } ];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing setlocal answer attributes", _Any)
     end;
@@ -117,9 +117,9 @@ decode_attributes(setlocal_answer, Rest) when is_binary(Rest) ->
 %%% %%<message:<id>:<processed>:[<name>]:<retvalue>[:<key>=<value>...]
 %%% TODO: name is optional verify with a test
 decode_attributes(message_answer, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Id, Processed, Name, RetVal | RawMsgParams ] -> 
-	    Attrs = [ { id, Id }, { processed, Processed }, { name, Name }, { retval, RetVal }],
+	    Attrs = [ { id, Id }, { processed, Processed }, { name, Name }, { retvalue, RetVal }],
 	    MsgParams = decode_attributes(message_parameters, RawMsgParams),
 	    [Attrs, MsgParams];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing answer message attributes", _Any)
@@ -127,17 +127,18 @@ decode_attributes(message_answer, Rest) when is_binary(Rest) ->
 
 %%% %%>message:<id>:<time>:<name>:<retvalue>[:<key>=<value>...]
 decode_attributes(message_incoming, Rest) when is_binary(Rest) ->
-    case string:tokens(binary_to_list(Rest), ":") of
+    case binary_split(Rest, ":") of
 	[ Id, Time, Name, RetVal | RawMsgParams ] -> 
-	    Attrs = [ { id, Id }, { time, Time }, { name, Name }, { retval, RetVal }],
+	    Attrs = [ { id, Id }, { time, Time }, { name, Name }, { retvalue, RetVal }],
 	    MsgParams = decode_attributes(message_parameters, RawMsgParams),
 	    [Attrs, MsgParams];
         _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing incoming message attributes", _Any)
     end;
 
+%%% NOTE: list_to_atom can be a problem if the system will be flooded by a lot of different keys
 decode_attributes(message_parameters, [H|T] = RawMsgParams) when is_list(RawMsgParams) ->
-    MsgParam = case string:tokens(H, "=") of
-		   [Key, Value] -> { list_to_atom(Key), Value };
+    MsgParam = case binary_split(H, "=") of
+		   [Key, Value] -> { list_to_atom(string_decode(Key)), Value };
 		   _Any -> ?THROW_YATE_EXCEPTION(invalid_data, "Error parsing message parameters", _Any)
 	       end,
     [MsgParam | decode_attributes(message_parameters, T)];
@@ -157,15 +158,44 @@ decode_attributes(message_parameters, []) ->
 apply_string_decode_on_values(KVList) ->
     lists:keymap(fun string_decode/1, 2, KVList).
 
+string_decode(B) when is_binary(B) ->
+    string_decode(binary_to_list(B));
+string_decode([]) ->
+    "";
 string_decode([H]) ->
     [ H ];
 string_decode([H1,H2| T]) ->
     { NewH, NewT } = case ([H1,H2]) of
 			 [ $%, $% ] -> {[ $% ], T};
 			     
-			 [ $%, C ] when C > 64 -> {[ C - 32 ], T}; 
+			 [ $%, C ] when C > 64 -> {[ C - 64 ], T}; 
     %%%                  [ $%, C ] when C < 64 -> ERROR;
 	                 [ C1, C2 ] -> {[ C1 ], [ C2 | T ]}
 		     end,
     NewH ++ string_decode(NewT).
+
+%%% Binary split from: http://stackoverflow.com/questions/428124/how-can-i-split-a-binary-in-erlang
+binary_split(Binary, Chars) ->
+    binary_split(Binary, Chars, 0, 0, []).
+
+binary_split(Bin, Chars, Idx, LastSplit, Acc)
+  when is_integer(Idx), is_integer(LastSplit) ->
+    Len = (Idx - LastSplit),
+    case Bin of
+        <<_:LastSplit/binary,
+         This:Len/binary,
+         Char,
+         _/binary>> ->
+            case lists:member(Char, Chars) of
+                false ->
+                    binary_split(Bin, Chars, Idx+1, LastSplit, Acc);
+                true ->
+                    binary_split(Bin, Chars, Idx+1, Idx+1, [This | Acc])
+            end;
+        <<_:LastSplit/binary,
+         This:Len/binary>> ->
+            lists:reverse([This | Acc]);
+        _ ->
+            lists:reverse(Acc)
+    end.
 

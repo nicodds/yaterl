@@ -30,11 +30,42 @@ encode_nonbinary_data(_Config) ->
     invalid_data = YateInvalidDataException#yate_exception.type.
 
 encode_invalid_application_yate_event(_Config) ->
-    { skip, "Test not yet implemented"}.
+    YateInvalidDataException = (catch yate_encode:to_binary(#yate_event{direction=nowhere})),
+    invalid_application_event = YateInvalidDataException#yate_exception.type.
 
 string_encode(_Config) ->
+    YateEventEncodedRetValue = #yate_event{
+      type=message,
+      direction=outgoing,
+      attrs=[{id, "generated_id_123"},{time, "12312312312"},{name, "call.route"},{retvalue, "test:encoding"}],
+      params=[{chan_id, "sip/1"}]
+     },
+    <<"%%>message:generated_id_123:12312312312:call.route:test%zencoding:chan_id=sip/1">> = 
+	yate_encode:to_binary(YateEventEncodedRetValue),
+    YateEventEncodedMsgParam1 = #yate_event{
+      type=message,
+      direction=outgoing,
+      attrs=[{id, "generated_id_123"},{time, "12312312312"},{name, "call.route"}],
+      params=[{chan_id, "sip/1"},{comment, "test:encoding1"}]
+     },
+    <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%zencoding1">> = 
+	yate_encode:to_binary(YateEventEncodedMsgParam1),
+    YateEventEncodedMsgParam2 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, "test=encoding2"}]
+     },
+    <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%}encoding2">> = 
+	yate_encode:to_binary(YateEventEncodedMsgParam2),
+    YateEventEncodedMsgParam3 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, "test%3"}]
+     },
+    <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%%3">> = 
+	yate_encode:to_binary(YateEventEncodedMsgParam3),
+    YateEventEncodedMsgParam4 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, [65,65,10,20,30]}]
+     },
+    <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=AA%J%T%^">> = 
+	yate_encode:to_binary(YateEventEncodedMsgParam4).
     
-    { skip, "Test not yet implemented"}.
 
 encode_output_yate_event(_Config) ->
     YateEvent = #yate_event{
@@ -42,7 +73,13 @@ encode_output_yate_event(_Config) ->
       direction=outgoing,
       attrs=[{text, "test message"}]
      },
-    <<"%%>output:test message">> = yate_encode:to_binary(YateEvent).
+    <<"%%>output:test message">> = yate_encode:to_binary(YateEvent),
+    YateEventNoText = #yate_event{
+      type=output,
+      direction=outgoing,
+      attrs=[{text, ""}]
+     },
+    <<"%%>output:">> = yate_encode:to_binary(YateEventNoText).
 
 encode_connect_yate_event(_Config) ->
     YateEvent = #yate_event{
@@ -155,7 +192,34 @@ encode_message_answer_yate_event(_Config) ->
       attrs=[{id, "generated_id_123"},{processed, "true"},{retvalue, "retvalue"}],
       params=[{chan_id, "sip/1"},{users, 2}]
      },
-    <<"%%<message:generated_id_123:true::retvalue:chan_id=sip/1:users=2">> = yate_encode:to_binary(YateEventIntegerParam).
+    <<"%%<message:generated_id_123:true::retvalue:chan_id=sip/1:users=2">> = yate_encode:to_binary(YateEventIntegerParam),
+    YateEventAtomParam = #yate_event{
+      type=message,
+      direction=answer,
+      attrs=[{id, "generated_id_123"},{processed, "true"},{retvalue, "retvalue"}],
+      params=[{chan_id, "sip/1"},{text, atom_value}]
+     },
+    <<"%%<message:generated_id_123:true::retvalue:chan_id=sip/1:text=atom_value">> = 
+	yate_encode:to_binary(YateEventAtomParam),
+    YateEventBinaryParam = #yate_event{
+      type=message,
+      direction=answer,
+      attrs=[{id, "generated_id_123"},{processed, "true"},{retvalue, "retvalue"}],
+      params=[{chan_id, "sip/1"},{text, <<"binary_value">>}]
+     },
+    <<"%%<message:generated_id_123:true::retvalue:chan_id=sip/1:text=binary_value">> = 
+	yate_encode:to_binary(YateEventBinaryParam),
+    YateEventMsgNoParam = #yate_event{
+      type=message,
+      direction=answer,
+      attrs=[{id, "generated_id_123"},{processed, "true"},{retvalue, "retvalue"}],
+      params=[]
+     },
+    <<"%%<message:generated_id_123:true::retvalue">> = 
+	yate_encode:to_binary(YateEventMsgNoParam).
+    
+    
+
 
 
 

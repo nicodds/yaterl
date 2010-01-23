@@ -47,8 +47,48 @@ decode_unknown_events(_Config) ->
     unknown_event = YateUnknownEventException#yate_exception.type.
 
 string_decode(_Config) ->
-    { skip, "Test not yet implemented"}.
-
+    YateEventEncodedRetValue = #yate_event{
+      type=message,
+      direction=incoming,
+      attrs=[{id, "generated_id_123"},{time, "12312312312"},{name, "call.route"},{retvalue, "test:encoding"}],
+      params=[{chan_id, "sip/1"}]
+     },
+    YateEventEncodedRetValue = 
+	yate_decode:from_binary(
+	  <<"%%>message:generated_id_123:12312312312:call.route:test%zencoding:chan_id=sip/1">>
+	 ),
+    io:format("encodedmsgparam1"),
+    YateEventEncodedMsgParam1 = #yate_event{
+      type=message,
+      direction=incoming,
+      attrs=[{id, "generated_id_123"},{time, "12312312312"},{name, "call.route"},{retvalue, ""}],
+      params=[{chan_id, "sip/1"},{comment, "test:encoding1"}]
+     },
+    YateEventEncodedMsgParam1 =	
+	yate_decode:from_binary(
+	  <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%zencoding1">>
+	 ),
+    YateEventEncodedMsgParam2 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, "test=encoding2"}]
+     },
+    YateEventEncodedMsgParam2 =
+	yate_decode:from_binary(
+	  <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%}encoding2">>
+	 ),
+    YateEventEncodedMsgParam3 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, "test%3"}]
+     },
+    YateEventEncodedMsgParam3 =
+	yate_decode:from_binary(
+	  <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=test%%3">>
+	 ),
+    YateEventEncodedMsgParam4 = YateEventEncodedMsgParam1#yate_event{
+      params=[{chan_id, "sip/1"},{comment, [65,65,10,20,30]}]
+     },
+    YateEventEncodedMsgParam4 =
+	yate_decode:from_binary(
+	  <<"%%>message:generated_id_123:12312312312:call.route::chan_id=sip/1:comment=AA%J%T%^">>
+	 ).
 
 decode_yate_errorin_incoming_event(_Config) ->
     ExpectedValue = #yate_event{
@@ -127,7 +167,7 @@ decode_yate_message_answer_event(_Config) ->
     ExpectedValue = #yate_event{
       direction=answer,
       type=message,
-      attrs=[{id, "messageid001"},{processed, "true"},{name, "call.route"},{retval, "retvalue"}],
+      attrs=[{id, "messageid001"},{processed, "true"},{name, "call.route"},{retvalue, "retvalue"}],
       params=[{chan_id, "sip/1"},{target_id, "sip/2"}]
      },
     ExpectedValue = yate_decode:from_binary(<<"%%<message:messageid001:true:call.route:retvalue:chan_id=sip/1:target_id=sip/2">>).
@@ -144,7 +184,7 @@ decode_yate_message_incoming_event(_Config) ->
     ExpectedValue = #yate_event{
       direction=incoming,
       type=message,
-      attrs=[{id, "messageid001"},{time, "123456789"},{name, "call.route"},{retval, "retvalue"}],
+      attrs=[{id, "messageid001"},{time, "123456789"},{name, "call.route"},{retvalue, "retvalue"}],
       params=[{chan_id, "sip/1"},{target_id, "sip/2"}]
      },
     ExpectedValue = yate_decode:from_binary(<<"%%>message:messageid001:123456789:call.route:retvalue:chan_id=sip/1:target_id=sip/2">>).
