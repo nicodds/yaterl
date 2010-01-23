@@ -160,14 +160,12 @@ apply_string_decode_on_values(KVList) ->
 string_decode([H]) ->
     [ H ];
 string_decode([H1,H2| T]) ->
-    NewH = case ([H1,H2]) of
-	       [ $%, $% ] -> NewT = T, 
-			     [ $% ];
-	       [ $%, C ] when C > 64 -> NewT = T, 
-					[ C - 32 ];
-%	       [ $%, C ] when C < 64 -> ERROR;
-	       [ C1, C2 ] -> NewT = [ C2 | T ],
-			      [ C1 ]
-	   end,
+    { NewH, NewT } = case ([H1,H2]) of
+			 [ $%, $% ] -> {[ $% ], T};
+			     
+			 [ $%, C ] when C > 64 -> {[ C - 32 ], T}; 
+    %%%                  [ $%, C ] when C < 64 -> ERROR;
+	                 [ C1, C2 ] -> {[ C1 ], [ C2 | T ]}
+		     end,
     NewH ++ string_decode(NewT).
 
